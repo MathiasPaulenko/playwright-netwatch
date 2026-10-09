@@ -47,7 +47,8 @@ On failure, the report includes an attachment like:
       "method": "POST",
       "resourceType": "fetch",
       "startedAt": 1791551255789,
-      "elapsedMs": 12300
+      "elapsedMs": 12300,
+      "status": 200
     }
   ],
   "connections": [
@@ -60,6 +61,8 @@ On failure, the report includes an attachment like:
   ]
 }
 ```
+
+A second attachment `netwatch-pending.txt` carries the same data as a readable table — the JSON is for tooling, the text is for humans reading the HTML report.
 
 Nothing is attached when the test ends with its expected status.
 
@@ -99,11 +102,12 @@ waitForRequests timed out after 10000ms: 1 request(s) still in flight
 
 ```ts
 await expect(netwatch).toHaveRequested('/api/login', { method: 'POST' });
+await expect(netwatch).toHaveRequested('/api/login', { status: 200 });
 await expect(netwatch).toHaveRequested(/\/users\/\d+/);
 await expect(netwatch).toHaveRequested((r) => r.url.includes('batch'));
 ```
 
-`urlOrPattern` accepts a substring, `RegExp`, or predicate over the request record. Options: `method` (case-insensitive), `timeout` (defaults to the expect timeout, 5000ms — honors `expect.configure`). It polls the request history — completed *and* in-flight requests count. On failure the error lists every request seen.
+`urlOrPattern` accepts a substring, `RegExp`, or predicate over the request record. Options: `method` (case-insensitive), `status` (response status code — matches once headers arrive), `timeout` (defaults to the expect timeout, 5000ms — honors `expect.configure`). It polls the request history — completed *and* in-flight requests count. On failure the error lists every request seen.
 
 Note: `toHaveRequested` lives on the `expect` exported by this package — the stock `expect` from `@playwright/test` doesn't know it.
 
@@ -120,7 +124,7 @@ const netwatch = new Netwatch(page);
 // ...
 netwatch.pending();          // in-flight requests with elapsedMs
 netwatch.openConnections();  // live websockets
-netwatch.history();          // all requests seen (pending/finished/failed)
+netwatch.history();          // all requests seen, with status/timing/duration
 netwatch.stats();            // counts by outcome + open connections
 netwatch.dispose();          // detach listeners when done
 ```

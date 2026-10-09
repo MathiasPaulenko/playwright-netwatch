@@ -22,14 +22,22 @@ Replace your `@playwright/test` import:
 ```ts
 import { test, expect } from 'playwright-netwatch';
 
-test('checkout', async ({ page, netwatch }) => {
+test('checkout', async ({ page }) => {
   await page.goto('/shop');
   // if this test fails or times out, the report gets a
   // `netwatch-pending` attachment with what was still in flight
 });
 ```
 
-The `netwatch` fixture tracks every request on the page. On failure, the report includes an attachment like:
+The `netwatch` fixture is automatic — every test gets a tracker on its `page`, no signature change needed. Destructure it when you want to drive `waitForRequests` or the assertions:
+
+```ts
+test('checkout', async ({ page, netwatch }) => {
+  await netwatch.waitForRequests({ below: 0 });
+});
+```
+
+On failure, the report includes an attachment like:
 
 ```json
 {
@@ -123,6 +131,7 @@ netwatch.dispose();          // detach listeners when done
 
 ## Notes
 
+- The automatic fixture creates a `page` (and its tracker) for every test using this `test` — including tests that would not otherwise need one. If that matters in a suite, import `test` from `@playwright/test` there instead.
 - SSE connections appear as in-flight requests with `resourceType: 'eventsource'` — filter them out of `waitForRequests` if they never close.
 - The tracker observes the page it's constructed on. Requests made by other pages in the same context are not tracked.
 - History grows for the life of the tracker; it's disposed automatically at the end of each test via the fixture.

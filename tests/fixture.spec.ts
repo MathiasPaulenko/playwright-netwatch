@@ -82,8 +82,14 @@ test('attaches netwatch-pending dump only when a test fails', async () => {
 
   const body = JSON.parse(
     Buffer.from(dump?.body ?? '', 'base64').toString('utf8'),
-  ) as { pending?: { url: string }[]; connections?: unknown[] };
+  ) as {
+    pending?: { url: string }[];
+    connections?: { type: string; url: string }[];
+  };
   expect(body.pending?.some((r) => r.url.includes('/hang'))).toBe(true);
+  expect(
+    body.connections?.some((c) => c.type === 'websocket' && c.url.includes('/ws')),
+  ).toBe(true);
 
   expect(passing?.attachments.some((a) => a.name === 'netwatch-pending')).toBe(
     false,

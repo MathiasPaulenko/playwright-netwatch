@@ -6,7 +6,9 @@ test('fails with a hanging request in flight', async ({ page, netwatch }) => {
   const server = await startServer();
   try {
     await page.goto(`${server.url}/ok`);
-    void page.evaluate(() => fetch('/hang'));
+    void page.evaluate(() => {
+      fetch('/hang').catch(() => {});
+    });
     await expect.poll(() => netwatch.pending().length).toBe(1);
 
     expect(true).toBe(false);

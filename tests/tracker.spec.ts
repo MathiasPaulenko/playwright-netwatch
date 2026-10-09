@@ -16,7 +16,9 @@ test('tracks in-flight requests until they finish', async ({ page }) => {
   const nw = new Netwatch(page);
   await page.goto(`${server.url}/ok`);
 
-  void page.evaluate(() => fetch('/slow?ms=300'));
+  void page.evaluate(() => {
+    fetch('/slow?ms=300').catch(() => {});
+  });
   await expect.poll(() => nw.pending().length).toBe(1);
 
   const pending = nw.pending()[0];

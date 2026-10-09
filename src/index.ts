@@ -7,3 +7,4 @@ export type {
   RequestOutcome,
   RequestRecord,
 } from './tracker.js';
+export type { RequestFilter, WaitForRequestsOptions } from './wait.js';

@@ -1,4 +1,5 @@
 import type { Page, Request, WebSocket } from '@playwright/test';
+import { waitForRequests, type WaitForRequestsOptions } from './wait.js';
 
 export type RequestOutcome = 'pending' | 'finished' | 'failed';
 
@@ -50,7 +51,12 @@ export class Netwatch {
   private readonly requests = new Map<Request, RequestEntry>();
   private readonly sockets = new Set<WebSocket>();
   private readonly socketMeta = new Map<WebSocket, SocketEntry>();
+  private readonly listeners = new Set<() => void>();
   private disposed = false;
+
+  private emitChange(): void {
+    for (const listener of this.listeners) listener();
+  }
 
   private readonly onRequest = (request: Request): void => {
     this.requests.set(request, {
@@ -60,6 +66,7 @@ export class Netwatch {
       outcome: 'pending',
       startedAt: Date.now(),
     });
+    this.emitChange();
   };
 
   private readonly onRequestFinished = (request: Request): void => {
@@ -67,6 +74,7 @@ export class Netwatch {
     if (!entry) return;
     entry.outcome = 'finished';
     entry.durationMs = Date.now() - entry.startedAt;
+    this.emitChange();
   };
 
   private readonly onRequestFailed = (request: Request): void => {
@@ -75,6 +83,7 @@ export class Netwatch {
     entry.outcome = 'failed';
     entry.durationMs = Date.now() - entry.startedAt;
     entry.failure = request.failure()?.errorText;
+    this.emitChange();
   };
 
   private readonly onWebSocket = (ws: WebSocket): void => {
@@ -83,7 +92,9 @@ export class Netwatch {
     ws.on('close', () => {
       this.sockets.delete(ws);
       this.socketMeta.delete(ws);
+      this.emitChange();
     });
+    this.emitChange();
   };
 
   constructor(private readonly page: Page) {
@@ -126,6 +137,23 @@ export class Netwatch {
   /** Every request observed so far, including ones still in flight. */
   history(): RequestRecord[] {
     return [...this.requests.values()].map((entry) => ({ ...entry }));
+  }
+
+  /**
+   * Resolve once in-flight requests stay at or below `below` for
+   * `idleMs` consecutive milliseconds. See {@link WaitForRequestsOptions}.
+   */
+  waitForRequests(options?: WaitForRequestsOptions): Promise<void> {
+    return waitForRequests(this, options);
+  }
+
+  /**
+   * Subscribe to network state changes (requests started, finished,
+   * failed, sockets opened or closed). Returns an unsubscribe function.
+   */
+  onChange(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** Detach all listeners from the page. */

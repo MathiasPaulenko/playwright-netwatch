@@ -1,0 +1,55 @@
+{
+  "name": "playwright-netwatch",
+  "version": "0.1.0",
+  "description": "Network diagnostics for Playwright tests: pending-request dumps on failure, granular network-idle waits, and request assertions.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "author": "Mathias Paulenko",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MathiasPaulenko/playwright-netwatch.git"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "network",
+    "e2e",
+    "debugging"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.40.0"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean",
+    "test": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.4",
+    "tsup": "^8.5.1",
+    "typescript": "~5.6.3"
+  }
+}

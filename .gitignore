@@ -4,6 +4,7 @@ dist/
 /test-results/
 /playwright-report/
 /blob-report/
+/coverage/
 
 # Notas internas de diseño e investigación — no publicar
 ref/

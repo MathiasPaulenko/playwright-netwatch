@@ -2,10 +2,11 @@ name: publish
 on:
   release:
     types: [published]
-  workflow_call:
+  push:
+    tags: ['v*']
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -17,6 +18,14 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      # Tag-push path: create the GitHub release here. Trusted publishing
+      # validates the top-level workflow name, so this stays in publish.yml
+      # (a workflow_call indirection would present the caller instead).
+      - name: Create release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
       # Trusted publishing requires npm CLI >= 11.5.1; Node 22 ships npm 10.x.
       - run: npm install -g npm@latest
       - run: npm ci

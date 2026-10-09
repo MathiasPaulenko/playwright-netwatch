@@ -28,16 +28,6 @@ export interface OpenConnection {
   elapsedMs: number;
 }
 
-interface RequestEntry {
-  url: string;
-  method: string;
-  resourceType: string;
-  outcome: 'pending' | 'finished' | 'failed';
-  startedAt: number;
-  durationMs?: number;
-  failure?: string;
-}
-
 interface SocketEntry {
   url: string;
   openedAt: number;
@@ -48,8 +38,7 @@ interface SocketEntry {
  * requests, request history and live websockets. No interception.
  */
 export class Netwatch {
-  private readonly requests = new Map<Request, RequestEntry>();
-  private readonly sockets = new Set<WebSocket>();
+  private readonly requests = new Map<Request, RequestRecord>();
   private readonly socketMeta = new Map<WebSocket, SocketEntry>();
   private readonly listeners = new Set<() => void>();
   private disposed = false;
@@ -87,10 +76,8 @@ export class Netwatch {
   };
 
   private readonly onWebSocket = (ws: WebSocket): void => {
-    this.sockets.add(ws);
     this.socketMeta.set(ws, { url: ws.url(), openedAt: Date.now() });
     ws.on('close', () => {
-      this.sockets.delete(ws);
       this.socketMeta.delete(ws);
       this.emitChange();
     });
@@ -125,10 +112,11 @@ export class Netwatch {
   openConnections(): OpenConnection[] {
     const now = Date.now();
     const out: OpenConnection[] = [];
-    for (const ws of this.sockets) {
-      if (ws.isClosed()) continue;
-      const meta = this.socketMeta.get(ws);
-      if (!meta) continue;
+    for (const [ws, meta] of this.socketMeta) {
+      if (ws.isClosed()) {
+        this.socketMeta.delete(ws);
+        continue;
+      }
       out.push({ type: 'websocket', ...meta, elapsedMs: now - meta.openedAt });
     }
     return out;

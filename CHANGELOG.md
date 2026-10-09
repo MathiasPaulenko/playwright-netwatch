@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0 — 2026-10-09
+
 ### Added
 
 - `RequestRecord.status` (HTTP status once response headers arrive) and `RequestRecord.timing` (Playwright timing breakdown) in `history()`. `PendingRequest` also exposes `status` — headers can arrive while the body is still streaming.

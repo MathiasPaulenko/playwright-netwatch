@@ -80,6 +80,31 @@ test('reports open websockets and drops closed ones', async ({ page }) => {
   await expect.poll(() => nw.openConnections().length).toBe(0);
 });
 
+test('stats summarizes tracked traffic by outcome', async ({ page }) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+
+  void page.evaluate(() => {
+    fetch('/slow?ms=50').catch(() => {});
+    fetch('/hang').catch(() => {});
+    const controller = new AbortController();
+    fetch('/hang?aborted=1', { signal: controller.signal }).catch(() => {});
+    setTimeout(() => controller.abort(), 50);
+  });
+  await page.waitForResponse((r) => r.url().includes('/slow'));
+  await expect
+    .poll(() => nw.history().some((r) => r.outcome === 'failed'))
+    .toBe(true);
+  await expect.poll(() => nw.pending().length).toBe(1);
+
+  const stats = nw.stats();
+  expect(stats.pending).toBe(1);
+  expect(stats.failed).toBe(1);
+  expect(stats.finished).toBeGreaterThanOrEqual(2); // /slow + document
+  expect(stats.total).toBe(stats.pending + stats.finished + stats.failed);
+  expect(stats.openConnections).toBe(0);
+});
+
 test('stops tracking after dispose', async ({ page }) => {
   const nw = new Netwatch(page);
   await page.goto(`${server.url}/ok`);

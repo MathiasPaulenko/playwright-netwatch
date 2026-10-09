@@ -44,21 +44,21 @@ function matchesFilter(
 
 /**
  * Resolve once the tracker's in-flight request count stays at or below
- * `below` for `idleMs` consecutive milliseconds. Requests matching
- * `filter` are excluded from the count. Rejects with a TimeoutError
- * that lists the requests still in flight.
+ * `below` for `idleMs` consecutive milliseconds, with the requests still
+ * counted as in flight. Requests matching `filter` are excluded from
+ * the count. Rejects with a TimeoutError that lists them.
  */
 export function waitForRequests(
   tracker: Netwatch,
   options: WaitForRequestsOptions = {},
-): Promise<void> {
+): Promise<PendingRequest[]> {
   const { below = 0, idleMs = 500, timeout = 30_000, filter } = options;
   const filters =
     filter === undefined ? [] : Array.isArray(filter) ? filter : [filter];
   const counts = (request: PendingRequest): boolean =>
     !matchesFilter(request, filters);
 
-  return new Promise((resolve, reject) => {
+  return new Promise<PendingRequest[]>((resolve, reject) => {
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
     let unsubscribe: () => void = () => {};
     let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
@@ -71,7 +71,7 @@ export function waitForRequests(
 
     const succeed = (): void => {
       cleanup();
-      resolve();
+      resolve(tracker.pending().filter(counts));
     };
 
     const fail = (): void => {

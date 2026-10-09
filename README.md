@@ -66,11 +66,12 @@ Nothing is attached when the test ends with its expected status.
 ## `waitForRequests` — network idle that works
 
 ```ts
-await netwatch.waitForRequests({
+const remaining = await netwatch.waitForRequests({
   below: 0,       // resolve when ≤ N requests are in flight (default 0)
   idleMs: 500,    // ...for this many consecutive ms (default 500)
   timeout: 10000, // give up after this (default 30000, 0 disables)
 });
+// resolves with the PendingRequest[] still counted as in flight
 ```
 
 Ignore traffic you don't care about — analytics, telemetry, an SSE stream that never ends:
@@ -118,6 +119,7 @@ const netwatch = new Netwatch(page);
 netwatch.pending();          // in-flight requests with elapsedMs
 netwatch.openConnections();  // live websockets
 netwatch.history();          // all requests seen (pending/finished/failed)
+netwatch.stats();            // counts by outcome + open connections
 netwatch.dispose();          // detach listeners when done
 ```
 
@@ -126,8 +128,8 @@ netwatch.dispose();          // detach listeners when done
 | Export | Description |
 | --- | --- |
 | `test`, `expect` | Playwright `test` extended with the `netwatch` fixture; `expect` extended with `toHaveRequested` |
-| `Netwatch` | `new Netwatch(page)`, `pending()`, `openConnections()`, `history()`, `waitForRequests()`, `onChange()`, `dispose()` |
-| Types | `PendingRequest`, `OpenConnection`, `RequestRecord`, `RequestOutcome`, `RequestFilter`, `WaitForRequestsOptions`, `ToHaveRequestedOptions`, `UrlPattern`, `NetwatchFixtures` |
+| `Netwatch` | `new Netwatch(page)`, `pending()`, `openConnections()`, `history()`, `stats()`, `waitForRequests()`, `onChange()`, `dispose()` |
+| Types | `PendingRequest`, `OpenConnection`, `RequestRecord`, `RequestOutcome`, `NetwatchStats`, `RequestFilter`, `WaitForRequestsOptions`, `ToHaveRequestedOptions`, `UrlPattern`, `NetwatchFixtures` |
 
 ## Notes
 

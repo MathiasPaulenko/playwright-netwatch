@@ -100,6 +100,26 @@ test('waits for a stable idle window, resetting on new activity', async ({
   expect(Date.now() - started).toBeGreaterThan(700);
 });
 
+test('resolves with the requests still counted as in flight', async ({
+  page,
+}) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+
+  void page.evaluate(() => {
+    fetch('/hang').catch(() => {});
+  });
+  await expect.poll(() => nw.pending().length).toBe(1);
+
+  const remaining = await nw.waitForRequests({
+    below: 1,
+    idleMs: 50,
+    timeout: 3000,
+  });
+  expect(remaining).toHaveLength(1);
+  expect(remaining[0].url).toContain('/hang');
+});
+
 test('filter ignores requests by url pattern', async ({ page }) => {
   const nw = new Netwatch(page);
   await page.goto(`${server.url}/ok`);
@@ -117,5 +137,28 @@ test('filter ignores requests by url pattern', async ({ page }) => {
     idleMs: 100,
     timeout: 3000,
     filter: { url: /source=analytics/ },
+  });
+});
+
+test('filter accepts a url predicate and an array of filters', async ({
+  page,
+}) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+
+  void page.evaluate(() => {
+    fetch('/hang?source=analytics').catch(() => {});
+    fetch('/hang?source=telemetry').catch(() => {});
+  });
+  await expect.poll(() => nw.pending().length).toBe(2);
+
+  await nw.waitForRequests({
+    below: 0,
+    idleMs: 100,
+    timeout: 3000,
+    filter: [
+      { url: (url) => url.includes('analytics') },
+      { url: 'telemetry' },
+    ],
   });
 });

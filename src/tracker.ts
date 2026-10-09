@@ -33,6 +33,14 @@ interface SocketEntry {
   openedAt: number;
 }
 
+export interface NetwatchStats {
+  total: number;
+  pending: number;
+  finished: number;
+  failed: number;
+  openConnections: number;
+}
+
 /**
  * Passive network observer for a Playwright page. Tracks in-flight
  * requests, request history and live websockets. No interception.
@@ -127,11 +135,31 @@ export class Netwatch {
     return [...this.requests.values()].map((entry) => ({ ...entry }));
   }
 
+  /** Counts of tracked traffic by outcome. */
+  stats(): NetwatchStats {
+    let pending = 0;
+    let finished = 0;
+    let failed = 0;
+    for (const entry of this.requests.values()) {
+      if (entry.outcome === 'pending') pending++;
+      else if (entry.outcome === 'finished') finished++;
+      else failed++;
+    }
+    return {
+      total: pending + finished + failed,
+      pending,
+      finished,
+      failed,
+      openConnections: this.openConnections().length,
+    };
+  }
+
   /**
    * Resolve once in-flight requests stay at or below `below` for
-   * `idleMs` consecutive milliseconds. See {@link WaitForRequestsOptions}.
+   * `idleMs` consecutive milliseconds, with the requests still counted
+   * as in flight. See {@link WaitForRequestsOptions}.
    */
-  waitForRequests(options?: WaitForRequestsOptions): Promise<void> {
+  waitForRequests(options?: WaitForRequestsOptions): Promise<PendingRequest[]> {
     return waitForRequests(this, options);
   }
 

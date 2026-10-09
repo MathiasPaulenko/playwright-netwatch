@@ -3,6 +3,7 @@ import { expect } from './matchers.js';
 import { Netwatch } from './tracker.js';
 
 export interface NetwatchFixtures {
+  /** Automatic tracker on the test's page. Destructure it to use it. */
   netwatch: Netwatch;
 }
 

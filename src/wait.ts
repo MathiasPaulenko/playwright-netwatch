@@ -2,7 +2,9 @@ import { errors } from '@playwright/test';
 import type { Netwatch, PendingRequest } from './tracker.js';
 
 export interface RequestFilter {
+  /** Substring, RegExp or predicate over the request URL. */
   url?: string | RegExp | ((url: string) => boolean);
+  /** Playwright resource type(s), e.g. 'fetch', 'eventsource'. */
   resourceType?: string | string[];
 }
 

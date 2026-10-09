@@ -1,4 +1,5 @@
 import { expect as baseExpect } from '@playwright/test';
+import type { ExpectMatcherState } from '@playwright/test';
 import type { Netwatch, RequestRecord } from './tracker.js';
 
 export type UrlPattern = string | RegExp | ((record: RequestRecord) => boolean);
@@ -29,7 +30,7 @@ function describe(pattern: UrlPattern): string {
  */
 export const expect = baseExpect.extend({
   async toHaveRequested(
-    this: { isNot: boolean; timeout?: number },
+    this: ExpectMatcherState,
     received: Netwatch,
     urlOrPattern: UrlPattern,
     options: ToHaveRequestedOptions = {},

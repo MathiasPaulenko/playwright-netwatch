@@ -5,11 +5,16 @@ export type RequestOutcome = 'pending' | 'finished' | 'failed';
 
 export interface RequestRecord {
   url: string;
+  /** HTTP method in upper case, e.g. 'GET'. */
   method: string;
+  /** Playwright resource type, e.g. 'document', 'fetch', 'eventsource'. */
   resourceType: string;
   outcome: RequestOutcome;
+  /** Epoch milliseconds when the request started. */
   startedAt: number;
+  /** Total time in milliseconds once finished or failed. */
   durationMs?: number;
+  /** Playwright error text when outcome is 'failed'. */
   failure?: string;
 }
 
@@ -17,14 +22,18 @@ export interface PendingRequest {
   url: string;
   method: string;
   resourceType: string;
+  /** Epoch milliseconds when the request started. */
   startedAt: number;
+  /** Milliseconds in flight at read time. */
   elapsedMs: number;
 }
 
 export interface OpenConnection {
   type: 'websocket';
   url: string;
+  /** Epoch milliseconds when the socket was created. */
   openedAt: number;
+  /** Milliseconds open at read time. */
   elapsedMs: number;
 }
 
@@ -34,10 +43,15 @@ interface SocketEntry {
 }
 
 export interface NetwatchStats {
+  /** All requests seen so far: pending + finished + failed. */
   total: number;
+  /** Requests still in flight. */
   pending: number;
+  /** Requests completed successfully (any HTTP status). */
   finished: number;
+  /** Requests aborted or failed at the network level. */
   failed: number;
+  /** Live websockets. */
   openConnections: number;
 }
 

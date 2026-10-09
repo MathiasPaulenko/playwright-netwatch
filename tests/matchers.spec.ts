@@ -73,3 +73,29 @@ test('toHaveRequested.not passes when the request was never made', async ({
     timeout: 500,
   });
 });
+
+test('toHaveRequested honors the configured expect timeout', async ({
+  page,
+  netwatch,
+}) => {
+  await page.goto(`${server.url}/ok`);
+
+  const configured = expect.configure({ timeout: 300 });
+  const started = Date.now();
+  await expect(
+    configured(netwatch).toHaveRequested('/nope'),
+  ).rejects.toThrow(/to have requested/);
+  expect(Date.now() - started).toBeLessThan(2000);
+});
+
+test('toHaveRequested.not names the request that matched', async ({
+  page,
+  netwatch,
+}) => {
+  await page.goto(`${server.url}/ok`);
+  await page.evaluate(() => fetch('/ok'));
+
+  await expect(
+    expect(netwatch).not.toHaveRequested('/ok', { timeout: 500 }),
+  ).rejects.toThrow(/matched.*\/ok|\/ok.*matched/i);
+});

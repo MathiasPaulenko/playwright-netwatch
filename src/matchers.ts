@@ -29,33 +29,36 @@ function describe(pattern: UrlPattern): string {
  */
 export const expect = baseExpect.extend({
   async toHaveRequested(
-    this: { isNot: boolean },
+    this: { isNot: boolean; timeout?: number },
     received: Netwatch,
     urlOrPattern: UrlPattern,
     options: ToHaveRequestedOptions = {},
   ): Promise<{ pass: boolean; name: string; message: () => string }> {
-    const { method, timeout = 5000 } = options;
+    const { method } = options;
+    const timeout = options.timeout ?? this.timeout ?? 5000;
     const deadline = Date.now() + timeout;
 
     const matches = (record: RequestRecord): boolean =>
       matchesUrl(record, urlOrPattern) &&
       (method === undefined || record.method === method);
 
-    let pass = received.history().some(matches);
-    while (!pass && Date.now() < deadline) {
+    let matched: RequestRecord | undefined = received.history().find(matches);
+    while (!matched && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 100));
-      pass = received.history().some(matches);
+      matched = received.history().find(matches);
     }
+    const pass = matched !== undefined;
 
     const wanted = `${method ? `${method} ` : ''}${describe(urlOrPattern)}`;
     const message = (): string => {
+      if (this.isNot && matched) {
+        return `expected netwatch not to have requested ${wanted}, but it matched:\n  ${matched.method} ${matched.url} [${matched.outcome}]`;
+      }
       const seen = received
         .history()
         .map((r) => `  ${r.method} ${r.url} [${r.outcome}]`)
         .join('\n');
-      return `expected netwatch ${
-        this.isNot ? 'not ' : ''
-      }to have requested ${wanted} within ${timeout}ms.\nRequests seen:\n${
+      return `expected netwatch to have requested ${wanted} within ${timeout}ms.\nRequests seen:\n${
         seen || '  (none)'
       }`;
     };

@@ -109,6 +109,14 @@ test('attaches netwatch-pending dump only when a test fails', async () => {
     ),
   ).toBe(true);
 
+  const textDump = failing!.attachments.find(
+    (a) => a.name === 'netwatch-pending.txt',
+  );
+  expect(textDump?.contentType).toBe('text/plain');
+  const text = Buffer.from(textDump?.body ?? '', 'base64').toString('utf8');
+  expect(text).toContain('/hang');
+  expect(text).toContain('websocket');
+
   // the headline case: a test that dies on timeout gets the same dump
   const timedOutBody = dumpBody(timedOut!);
   expect(timedOut!.ok).toBe(false);

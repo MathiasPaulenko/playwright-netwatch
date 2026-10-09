@@ -1,6 +1,6 @@
 {
   "name": "playwright-netwatch",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Network diagnostics for Playwright tests: pending-request dumps on failure, granular network-idle waits, and request assertions.",
   "type": "module",
   "main": "./dist/index.cjs",

@@ -1,4 +1,5 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import { expect } from './matchers.js';
 import { Netwatch } from './tracker.js';
 
 export interface NetwatchFixtures {

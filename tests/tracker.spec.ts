@@ -105,6 +105,36 @@ test('stats summarizes tracked traffic by outcome', async ({ page }) => {
   expect(stats.openConnections).toBe(0);
 });
 
+test('onChange fires on request lifecycle and unsubscribes', async ({
+  page,
+}) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+
+  let calls = 0;
+  const unsubscribe = nw.onChange(() => calls++);
+
+  void page.evaluate(() => {
+    fetch('/slow?ms=50').catch(() => {});
+  });
+  await expect.poll(() => calls).toBeGreaterThanOrEqual(2);
+
+  unsubscribe();
+  const callsAfterUnsubscribe = calls;
+  void page.evaluate(() => {
+    fetch('/slow?ms=50').catch(() => {});
+  });
+  await expect
+    .poll(
+      () =>
+        nw.history().filter(
+          (r) => r.url.includes('/slow') && r.outcome === 'finished',
+        ).length,
+    )
+    .toBe(2);
+  expect(calls).toBe(callsAfterUnsubscribe);
+});
+
 test('stops tracking after dispose', async ({ page }) => {
   const nw = new Netwatch(page);
   await page.goto(`${server.url}/ok`);

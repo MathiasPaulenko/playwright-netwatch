@@ -65,6 +65,24 @@ async function runFixtureSpecs(): Promise<{ code: number; specs: SpecResult[] }>
   return { code, specs };
 }
 
+interface DumpBody {
+  pending?: {
+    url: string;
+    method: string;
+    resourceType: string;
+    elapsedMs: number;
+  }[];
+  connections?: { type: string; url: string }[];
+}
+
+function dumpBody(spec: SpecResult): DumpBody | undefined {
+  const dump = spec.attachments.find((a) => a.name === 'netwatch-pending');
+  if (!dump?.body) return undefined;
+  return JSON.parse(
+    Buffer.from(dump.body, 'base64').toString('utf8'),
+  ) as DumpBody;
+}
+
 test('attaches netwatch-pending dump only when a test fails', async () => {
   test.setTimeout(120_000);
 
@@ -72,23 +90,30 @@ test('attaches netwatch-pending dump only when a test fails', async () => {
   expect(code).not.toBe(0);
 
   const failing = specs.find((s) => s.title.includes('hanging request'));
+  const timedOut = specs.find((s) => s.title.includes('dies on timeout'));
   const passing = specs.find((s) => s.title.includes('quiet network'));
   expect(failing).toBeDefined();
+  expect(timedOut).toBeDefined();
   expect(passing).toBeDefined();
 
-  const dump = failing?.attachments.find((a) => a.name === 'netwatch-pending');
-  expect(dump).toBeDefined();
-  expect(dump?.contentType).toBe('application/json');
-
-  const body = JSON.parse(
-    Buffer.from(dump?.body ?? '', 'base64').toString('utf8'),
-  ) as {
-    pending?: { url: string }[];
-    connections?: { type: string; url: string }[];
-  };
-  expect(body.pending?.some((r) => r.url.includes('/hang'))).toBe(true);
+  const body = dumpBody(failing!);
+  expect(body).toBeDefined();
+  const hung = body?.pending?.find((r) => r.url.includes('/hang'));
+  expect(hung).toBeDefined();
+  expect(hung?.method).toBe('GET');
+  expect(hung?.resourceType).toBe('fetch');
+  expect(hung?.elapsedMs).toBeGreaterThanOrEqual(0);
   expect(
-    body.connections?.some((c) => c.type === 'websocket' && c.url.includes('/ws')),
+    body?.connections?.some(
+      (c) => c.type === 'websocket' && c.url.includes('/ws'),
+    ),
+  ).toBe(true);
+
+  // the headline case: a test that dies on timeout gets the same dump
+  const timedOutBody = dumpBody(timedOut!);
+  expect(timedOut!.ok).toBe(false);
+  expect(
+    timedOutBody?.pending?.some((r) => r.url.includes('/hang')),
   ).toBe(true);
 
   expect(passing?.attachments.some((a) => a.name === 'netwatch-pending')).toBe(

@@ -23,4 +23,18 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - run: npm run build
+      # Idempotent: skip when the version is already on npm (e.g. the
+      # manual first publish, or re-running a failed release job).
+      - name: Check published version
+        id: published
+        env:
+          TAG: ${{ github.event.release.tag_name || github.ref_name }}
+        run: |
+          V="${TAG#v}"
+          if npm view "playwright-netwatch@$V" version > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - run: npm publish --provenance --access public
+        if: steps.published.outputs.exists == 'false'

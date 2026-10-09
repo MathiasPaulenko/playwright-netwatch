@@ -1,5 +1,8 @@
 # playwright-netwatch
 
+[![npm](https://img.shields.io/npm/v/playwright-netwatch)](https://www.npmjs.com/package/playwright-netwatch)
+[![test](https://github.com/MathiasPaulenko/playwright-netwatch/actions/workflows/test.yml/badge.svg)](https://github.com/MathiasPaulenko/playwright-netwatch/actions/workflows/test.yml)
+
 Network diagnostics for Playwright tests. Passive observation only — no interception, no mocking.
 
 Answers two questions that are painful today:

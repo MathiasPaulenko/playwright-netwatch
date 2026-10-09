@@ -26,7 +26,7 @@ test('toHaveRequested matches by regex and method', async ({
 }) => {
   await page.goto(`${server.url}/ok`);
   await page.evaluate(() => fetch('/ok', { method: 'POST' }));
-  await expect(netwatch).toHaveRequested(/\/ok$/, { method: 'POST' });
+  await expect(netwatch).toHaveRequested(/\/ok$/, { method: 'post' });
 });
 
 test('toHaveRequested matches requests still in flight', async ({

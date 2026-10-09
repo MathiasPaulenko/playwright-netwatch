@@ -103,7 +103,9 @@ await expect(netwatch).toHaveRequested(/\/users\/\d+/);
 await expect(netwatch).toHaveRequested((r) => r.url.includes('batch'));
 ```
 
-`urlOrPattern` accepts a substring, `RegExp`, or predicate over the request record. Options: `method`, `timeout` (default 5000). It polls the request history — completed *and* in-flight requests count. On failure the error lists every request seen.
+`urlOrPattern` accepts a substring, `RegExp`, or predicate over the request record. Options: `method` (case-insensitive), `timeout` (defaults to the expect timeout, 5000ms — honors `expect.configure`). It polls the request history — completed *and* in-flight requests count. On failure the error lists every request seen.
+
+Note: `toHaveRequested` lives on the `expect` exported by this package — the stock `expect` from `@playwright/test` doesn't know it.
 
 `not` works too: `await expect(netwatch).not.toHaveRequested('/api/mutate')`.
 

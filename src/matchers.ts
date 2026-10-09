@@ -40,7 +40,8 @@ export const expect = baseExpect.extend({
 
     const matches = (record: RequestRecord): boolean =>
       matchesUrl(record, urlOrPattern) &&
-      (method === undefined || record.method === method);
+      (method === undefined ||
+        record.method.toUpperCase() === method.toUpperCase());
 
     let matched: RequestRecord | undefined = received.history().find(matches);
     while (!matched && Date.now() < deadline) {

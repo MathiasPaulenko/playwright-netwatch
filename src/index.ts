@@ -9,3 +9,4 @@ export type {
   RequestRecord,
 } from './tracker.js';
 export type { RequestFilter, WaitForRequestsOptions } from './wait.js';
+export type { ToHaveRequestedOptions, UrlPattern } from './matchers.js';

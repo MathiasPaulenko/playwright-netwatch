@@ -75,6 +75,13 @@ test('times out with a clear error listing pending requests', async ({
   ).rejects.toThrow(/\/hang/);
 });
 
+test('timeout 0 disables the timeout', async ({ page }) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+
+  await nw.waitForRequests({ below: 0, idleMs: 50, timeout: 0 });
+});
+
 test('waits for a stable idle window, resetting on new activity', async ({
   page,
 }) => {

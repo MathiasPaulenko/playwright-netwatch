@@ -11,7 +11,7 @@ export interface WaitForRequestsOptions {
   below?: number;
   /** Required consecutive milliseconds under the threshold. Default 500. */
   idleMs?: number;
-  /** Give up after this many milliseconds. Default 30000. */
+  /** Give up after this many milliseconds. Default 30000. 0 disables it. */
   timeout?: number;
   /** Requests matching the filter are not counted as in-flight. */
   filter?: RequestFilter | RequestFilter[];
@@ -53,7 +53,8 @@ export function waitForRequests(
   options: WaitForRequestsOptions = {},
 ): Promise<void> {
   const { below = 0, idleMs = 500, timeout = 30_000, filter } = options;
-  const filters = filter === undefined ? [] : Array.isArray(filter) ? filter : [filter];
+  const filters =
+    filter === undefined ? [] : Array.isArray(filter) ? filter : [filter];
   const counts = (request: PendingRequest): boolean =>
     !matchesFilter(request, filters);
 
@@ -99,7 +100,8 @@ export function waitForRequests(
     };
 
     unsubscribe = tracker.onChange(check);
-    timeoutTimer = setTimeout(fail, timeout);
+    // timeout <= 0 means no timeout, matching Playwright wait conventions.
+    if (timeout > 0) timeoutTimer = setTimeout(fail, timeout);
     check();
   });
 }

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Notas internas de diseño e investigación — no publicar
+ref/

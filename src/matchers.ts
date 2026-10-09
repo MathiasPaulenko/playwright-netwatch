@@ -5,9 +5,11 @@ import type { Netwatch, RequestRecord } from './tracker.js';
 export type UrlPattern = string | RegExp | ((record: RequestRecord) => boolean);
 
 export interface ToHaveRequestedOptions {
-  /** Required HTTP method (e.g. 'POST'). Any method matches by default. */
+  /** Required HTTP method, case-insensitive (e.g. 'POST'). Any method matches by default. */
   method?: string;
-  /** Give up polling after this many milliseconds. Default 5000. */
+  /** Required response status code (e.g. 200). Any status matches by default. */
+  status?: number;
+  /** Give up polling after this many milliseconds. Defaults to the expect timeout. */
   timeout?: number;
 }
 
@@ -35,14 +37,15 @@ export const expect = baseExpect.extend({
     urlOrPattern: UrlPattern,
     options: ToHaveRequestedOptions = {},
   ): Promise<{ pass: boolean; name: string; message: () => string }> {
-    const { method } = options;
+    const { method, status } = options;
     const timeout = options.timeout ?? this.timeout ?? 5000;
     const deadline = Date.now() + timeout;
 
     const matches = (record: RequestRecord): boolean =>
       matchesUrl(record, urlOrPattern) &&
       (method === undefined ||
-        record.method.toUpperCase() === method.toUpperCase());
+        record.method.toUpperCase() === method.toUpperCase()) &&
+      (status === undefined || record.status === status);
 
     let matched: RequestRecord | undefined = received.history().find(matches);
     while (!matched && Date.now() < deadline) {
@@ -51,15 +54,18 @@ export const expect = baseExpect.extend({
     }
     const pass = matched !== undefined;
 
-    const wanted = `${method ? `${method} ` : ''}${describe(urlOrPattern)}`;
+    const wanted = `${method ? `${method} ` : ''}${describe(urlOrPattern)}${
+      status !== undefined ? ` with status ${status}` : ''
+    }`;
+    const formatRecord = (r: RequestRecord): string =>
+      `  ${r.method} ${r.url} [${r.outcome}${
+        r.status !== undefined ? ` ${r.status}` : ''
+      }]`;
     const message = (): string => {
       if (this.isNot && matched) {
-        return `expected netwatch not to have requested ${wanted}, but it matched:\n  ${matched.method} ${matched.url} [${matched.outcome}]`;
+        return `expected netwatch not to have requested ${wanted}, but it matched:\n${formatRecord(matched)}`;
       }
-      const seen = received
-        .history()
-        .map((r) => `  ${r.method} ${r.url} [${r.outcome}]`)
-        .join('\n');
+      const seen = received.history().map(formatRecord).join('\n');
       return `expected netwatch to have requested ${wanted} within ${timeout}ms.\nRequests seen:\n${
         seen || '  (none)'
       }`;

@@ -1,4 +1,4 @@
-import type { Page, Request, WebSocket } from '@playwright/test';
+import type { Page, Request, Response, WebSocket } from '@playwright/test';
 import { waitForRequests, type WaitForRequestsOptions } from './wait.js';
 
 export type RequestOutcome = 'pending' | 'finished' | 'failed';
@@ -14,8 +14,12 @@ export interface RequestRecord {
   startedAt: number;
   /** Total time in milliseconds once finished or failed. */
   durationMs?: number;
+  /** HTTP status code once response headers arrive. */
+  status?: number;
   /** Playwright error text when outcome is 'failed'. */
   failure?: string;
+  /** Network timing breakdown once the request finishes. */
+  timing?: ReturnType<Request['timing']>;
 }
 
 export interface PendingRequest {
@@ -26,6 +30,8 @@ export interface PendingRequest {
   startedAt: number;
   /** Milliseconds in flight at read time. */
   elapsedMs: number;
+  /** HTTP status code once response headers arrive (body may still be streaming). */
+  status?: number;
 }
 
 export interface OpenConnection {
@@ -80,11 +86,19 @@ export class Netwatch {
     this.emitChange();
   };
 
+  private readonly onResponse = (response: Response): void => {
+    const entry = this.requests.get(response.request());
+    if (!entry) return;
+    entry.status = response.status();
+    this.emitChange();
+  };
+
   private readonly onRequestFinished = (request: Request): void => {
     const entry = this.requests.get(request);
     if (!entry) return;
     entry.outcome = 'finished';
     entry.durationMs = Date.now() - entry.startedAt;
+    entry.timing = request.timing();
     this.emitChange();
   };
 
@@ -108,6 +122,7 @@ export class Netwatch {
 
   constructor(private readonly page: Page) {
     page.on('request', this.onRequest);
+    page.on('response', this.onResponse);
     page.on('requestfinished', this.onRequestFinished);
     page.on('requestfailed', this.onRequestFailed);
     page.on('websocket', this.onWebSocket);
@@ -125,6 +140,7 @@ export class Netwatch {
         resourceType: entry.resourceType,
         startedAt: entry.startedAt,
         elapsedMs: now - entry.startedAt,
+        status: entry.status,
       });
     }
     return out;
@@ -191,6 +207,7 @@ export class Netwatch {
     if (this.disposed) return;
     this.disposed = true;
     this.page.off('request', this.onRequest);
+    this.page.off('response', this.onResponse);
     this.page.off('requestfinished', this.onRequestFinished);
     this.page.off('requestfailed', this.onRequestFailed);
     this.page.off('websocket', this.onWebSocket);

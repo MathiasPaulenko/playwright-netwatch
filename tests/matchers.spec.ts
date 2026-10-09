@@ -64,6 +64,20 @@ test('toHaveRequested fails listing the requests it saw', async ({
   ).rejects.toThrow(/GET http.*\/ok/);
 });
 
+test('toHaveRequested matches by response status', async ({
+  page,
+  netwatch,
+}) => {
+  await page.goto(`${server.url}/ok`);
+  await page.evaluate(() => fetch('/missing'));
+
+  await expect(netwatch).toHaveRequested('/missing', { status: 404 });
+  await expect(netwatch).not.toHaveRequested('/missing', {
+    status: 200,
+    timeout: 300,
+  });
+});
+
 test('toHaveRequested.not passes when the request was never made', async ({
   page,
   netwatch,

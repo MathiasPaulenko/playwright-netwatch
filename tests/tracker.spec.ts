@@ -61,6 +61,21 @@ test('records finished requests in history', async ({ page }) => {
   expect(record?.durationMs).toBeGreaterThanOrEqual(50);
 });
 
+test('records response status and timing for finished requests', async ({
+  page,
+}) => {
+  const nw = new Netwatch(page);
+  await page.goto(`${server.url}/ok`);
+  await page.evaluate(() => fetch('/missing'));
+
+  const ok = nw.history().find((r) => r.url.endsWith('/ok'));
+  expect(ok?.status).toBe(200);
+  expect(ok?.timing?.responseEnd).toBeGreaterThanOrEqual(0);
+
+  const missing = nw.history().find((r) => r.url.includes('/missing'));
+  expect(missing?.status).toBe(404);
+});
+
 test('reports open websockets and drops closed ones', async ({ page }) => {
   const nw = new Netwatch(page);
   await page.goto(`${server.url}/ok`);

@@ -18,7 +18,25 @@ function fakeRequest(
     resourceType: () => options.resourceType ?? 'fetch',
     failure: () =>
       options.failure ? { errorText: options.failure } : null,
+    timing: () => ({
+      startTime: 0,
+      domainLookupStart: -1,
+      domainLookupEnd: -1,
+      connectStart: -1,
+      connectEnd: -1,
+      secureConnectionStart: -1,
+      requestStart: 1,
+      responseStart: 2,
+      responseEnd: 3,
+    }),
   } as unknown as Request;
+}
+
+function fakeResponse(request: Request, status: number) {
+  return {
+    request: () => request,
+    status: () => status,
+  };
 }
 
 function fakeSocket(url: string): WebSocket {
@@ -95,6 +113,20 @@ test.describe('Netwatch (unit)', () => {
     expect(nw.openConnections()).toHaveLength(0);
   });
 
+  test('records response status and timing once finished', () => {
+    const page = new EventEmitter();
+    const nw = new Netwatch(page as unknown as Page);
+
+    const req = fakeRequest('http://x/api');
+    page.emit('request', req);
+    page.emit('response', fakeResponse(req, 201));
+    page.emit('requestfinished', req);
+
+    const record = nw.history()[0];
+    expect(record.status).toBe(201);
+    expect(record.timing).toBeDefined();
+  });
+
   test('dispose detaches page listeners', () => {
     const page = new EventEmitter();
     const nw = new Netwatch(page as unknown as Page);
@@ -159,5 +191,20 @@ test.describe('toHaveRequested (unit)', () => {
 
     await nwExpect(nw).toHaveRequested('/login', { method: 'post' });
     await nwExpect(nw).not.toHaveRequested('/logout', { timeout: 100 });
+  });
+
+  test('matches by response status', async () => {
+    const page = new EventEmitter();
+    const nw = new Netwatch(page as unknown as Page);
+
+    const req = fakeRequest('http://x/login', { method: 'POST' });
+    page.emit('request', req);
+    page.emit('response', fakeResponse(req, 200));
+
+    await nwExpect(nw).toHaveRequested('/login', { status: 200 });
+    await nwExpect(nw).not.toHaveRequested('/login', {
+      status: 500,
+      timeout: 100,
+    });
   });
 });

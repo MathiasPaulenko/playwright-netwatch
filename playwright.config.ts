@@ -4,5 +4,10 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   reporter: 'list',
-  use: { browserName: 'chromium' },
+  use: {
+    browserName: 'chromium',
+    // Device Guard on dev machines blocks playwright-managed browsers;
+    // fall back to system Chrome locally, bundled chromium in CI.
+    channel: process.env.CI ? undefined : 'chrome',
+  },
 });

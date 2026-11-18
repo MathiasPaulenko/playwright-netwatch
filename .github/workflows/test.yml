@@ -10,9 +10,11 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Playwright's devDependency requires Node >=20, so the 18 floor
+    # declared in engines can't be exercised in this repo's CI.
     strategy:
       matrix:
-        node: [18, 20, 22]
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

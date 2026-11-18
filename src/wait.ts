@@ -24,7 +24,12 @@ function matchesUrl(
   pattern: NonNullable<RequestFilter['url']>,
 ): boolean {
   if (typeof pattern === 'string') return url.includes(pattern);
-  if (pattern instanceof RegExp) return pattern.test(url);
+  if (pattern instanceof RegExp) {
+    // 'g'/'y' flags make .test() stateful via lastIndex — reset for
+    // deterministic results across repeated evaluations.
+    pattern.lastIndex = 0;
+    return pattern.test(url);
+  }
   return pattern(url);
 }
 
@@ -54,9 +59,57 @@ export function waitForRequests(
   tracker: Netwatch,
   options: WaitForRequestsOptions = {},
 ): Promise<PendingRequest[]> {
-  const { below = 0, idleMs = 500, timeout = 30_000, filter } = options;
+  const {
+    below = 0,
+    idleMs = 500,
+    timeout = 30_000,
+    filter,
+  } = options ?? {};
+  if (!Number.isFinite(below) || below < 0)
+    throw new RangeError(
+      `waitForRequests: 'below' must be a number >= 0, got ${below}`,
+    );
+  if (!Number.isFinite(idleMs) || idleMs < 0)
+    throw new RangeError(
+      `waitForRequests: 'idleMs' must be a number >= 0, got ${idleMs}`,
+    );
+  if (typeof timeout !== 'number' || Number.isNaN(timeout))
+    throw new RangeError(
+      `waitForRequests: 'timeout' must be a number, got ${timeout}`,
+    );
   const filters =
     filter === undefined ? [] : Array.isArray(filter) ? filter : [filter];
+  for (const entry of filters) {
+    if (
+      entry === null ||
+      typeof entry !== 'object' ||
+      Array.isArray(entry) ||
+      entry instanceof RegExp
+    ) {
+      throw new TypeError(
+        'waitForRequests: each filter must be an object like { url, resourceType }',
+      );
+    }
+    if (
+      entry.url !== undefined &&
+      typeof entry.url !== 'string' &&
+      !(entry.url instanceof RegExp) &&
+      typeof entry.url !== 'function'
+    ) {
+      throw new TypeError(
+        "waitForRequests: filter 'url' must be a string, RegExp or predicate",
+      );
+    }
+    if (
+      entry.resourceType !== undefined &&
+      typeof entry.resourceType !== 'string' &&
+      !Array.isArray(entry.resourceType)
+    ) {
+      throw new TypeError(
+        "waitForRequests: filter 'resourceType' must be a string or list of strings",
+      );
+    }
+  }
   const counts = (request: PendingRequest): boolean =>
     !matchesFilter(request, filters);
 
@@ -102,8 +155,10 @@ export function waitForRequests(
     };
 
     unsubscribe = tracker.onChange(check);
-    // timeout <= 0 means no timeout, matching Playwright wait conventions.
-    if (timeout > 0) timeoutTimer = setTimeout(fail, timeout);
+    // timeout <= 0 or non-finite means no timeout, matching Playwright wait
+    // conventions — Infinity would clamp setTimeout to ~1ms and fire instantly.
+    if (timeout > 0 && Number.isFinite(timeout))
+      timeoutTimer = setTimeout(fail, timeout);
     check();
   });
 }

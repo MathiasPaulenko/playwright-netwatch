@@ -15,7 +15,12 @@ export interface ToHaveRequestedOptions {
 
 function matchesUrl(record: RequestRecord, pattern: UrlPattern): boolean {
   if (typeof pattern === 'string') return record.url.includes(pattern);
-  if (pattern instanceof RegExp) return pattern.test(record.url);
+  if (pattern instanceof RegExp) {
+    // 'g'/'y' flags make .test() stateful via lastIndex — reset for
+    // deterministic results across repeated polls.
+    pattern.lastIndex = 0;
+    return pattern.test(record.url);
+  }
   return pattern(record);
 }
 
@@ -37,8 +42,31 @@ export const expect = baseExpect.extend({
     urlOrPattern: UrlPattern,
     options: ToHaveRequestedOptions = {},
   ): Promise<{ pass: boolean; name: string; message: () => string }> {
-    const { method, status } = options;
-    const timeout = options.timeout ?? this.timeout ?? 5000;
+    const tracker = received as Partial<Netwatch> | null | undefined;
+    if (tracker == null || typeof tracker.history !== 'function') {
+      throw new TypeError('toHaveRequested must be used on a Netwatch tracker');
+    }
+    if (
+      typeof urlOrPattern !== 'string' &&
+      !(urlOrPattern instanceof RegExp) &&
+      typeof urlOrPattern !== 'function'
+    ) {
+      throw new TypeError(
+        'toHaveRequested expects a string, RegExp or predicate as the url pattern',
+      );
+    }
+    const { method, status } = options ?? {};
+    if (method !== undefined && typeof method !== 'string') {
+      throw new TypeError(`toHaveRequested: 'method' must be a string`);
+    }
+    if (status !== undefined && typeof status !== 'number') {
+      throw new TypeError(`toHaveRequested: 'status' must be a number`);
+    }
+    const timeout = options?.timeout ?? this.timeout ?? 5000;
+    if (typeof timeout !== 'number' || Number.isNaN(timeout))
+      throw new RangeError(
+        `toHaveRequested: 'timeout' must be a number, got ${timeout}`,
+      );
     const deadline = Date.now() + timeout;
 
     const matches = (record: RequestRecord): boolean =>
@@ -47,11 +75,13 @@ export const expect = baseExpect.extend({
         record.method.toUpperCase() === method.toUpperCase()) &&
       (status === undefined || record.status === status);
 
-    let matched: RequestRecord | undefined = received.history().find(matches);
+    let matched: RequestRecord | undefined = tracker.history().find(matches);
     while (!matched && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 100));
-      matched = received.history().find(matches);
+      matched = tracker.history().find(matches);
     }
+    // One last read so a request landing just before the deadline isn't missed.
+    matched ??= tracker.history().find(matches);
     const pass = matched !== undefined;
 
     const wanted = `${method ? `${method} ` : ''}${describe(urlOrPattern)}${

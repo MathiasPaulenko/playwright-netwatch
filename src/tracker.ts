@@ -67,12 +67,26 @@ export interface NetwatchStats {
  */
 export class Netwatch {
   private readonly requests = new Map<Request, RequestRecord>();
+  // Mirrors records with outcome 'pending' — keeps pending() O(in-flight)
+  // instead of O(history) on every network event.
+  private readonly inFlight = new Set<Request>();
   private readonly socketMeta = new Map<WebSocket, SocketEntry>();
   private readonly listeners = new Set<() => void>();
   private disposed = false;
 
   private emitChange(): void {
-    for (const listener of this.listeners) listener();
+    // Every listener runs even when one throws, so a bad subscriber can't
+    // silently starve internal consumers (e.g. waitForRequests). The first
+    // error is rethrown afterwards so the failure still surfaces.
+    let firstError: unknown;
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    if (firstError !== undefined) throw firstError;
   }
 
   private readonly onRequest = (request: Request): void => {
@@ -83,6 +97,7 @@ export class Netwatch {
       outcome: 'pending',
       startedAt: Date.now(),
     });
+    this.inFlight.add(request);
     this.emitChange();
   };
 
@@ -96,15 +111,21 @@ export class Netwatch {
   private readonly onRequestFinished = (request: Request): void => {
     const entry = this.requests.get(request);
     if (!entry) return;
+    this.inFlight.delete(request);
     entry.outcome = 'finished';
     entry.durationMs = Date.now() - entry.startedAt;
-    entry.timing = request.timing();
+    try {
+      entry.timing = request.timing();
+    } catch {
+      // timing is unavailable for some request kinds (e.g. service worker)
+    }
     this.emitChange();
   };
 
   private readonly onRequestFailed = (request: Request): void => {
     const entry = this.requests.get(request);
     if (!entry) return;
+    this.inFlight.delete(request);
     entry.outcome = 'failed';
     entry.durationMs = Date.now() - entry.startedAt;
     entry.failure = request.failure()?.errorText;
@@ -121,6 +142,9 @@ export class Netwatch {
   };
 
   constructor(private readonly page: Page) {
+    if (typeof (page as Page | undefined)?.on !== 'function') {
+      throw new TypeError('Netwatch expects a Playwright Page');
+    }
     page.on('request', this.onRequest);
     page.on('response', this.onResponse);
     page.on('requestfinished', this.onRequestFinished);
@@ -132,8 +156,9 @@ export class Netwatch {
   pending(): PendingRequest[] {
     const now = Date.now();
     const out: PendingRequest[] = [];
-    for (const entry of this.requests.values()) {
-      if (entry.outcome !== 'pending') continue;
+    for (const request of this.inFlight) {
+      const entry = this.requests.get(request);
+      if (!entry) continue;
       out.push({
         url: entry.url,
         method: entry.method,
@@ -162,7 +187,10 @@ export class Netwatch {
 
   /** Every request observed so far, including ones still in flight. */
   history(): RequestRecord[] {
-    return [...this.requests.values()].map((entry) => ({ ...entry }));
+    return [...this.requests.values()].map((entry) => ({
+      ...entry,
+      timing: entry.timing ? { ...entry.timing } : undefined,
+    }));
   }
 
   /** Counts of tracked traffic by outcome. */
@@ -198,6 +226,9 @@ export class Netwatch {
    * failed, sockets opened or closed). Returns an unsubscribe function.
    */
   onChange(listener: () => void): () => void {
+    if (typeof listener !== 'function') {
+      throw new TypeError('onChange expects a listener function');
+    }
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
@@ -211,5 +242,6 @@ export class Netwatch {
     this.page.off('requestfinished', this.onRequestFinished);
     this.page.off('requestfailed', this.onRequestFailed);
     this.page.off('websocket', this.onWebSocket);
+    this.listeners.clear();
   }
 }

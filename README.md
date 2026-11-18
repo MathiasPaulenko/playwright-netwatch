@@ -75,7 +75,7 @@ Nothing is attached when the test ends with its expected status.
 const remaining = await netwatch.waitForRequests({
   below: 0,       // resolve when ≤ N requests are in flight (default 0)
   idleMs: 500,    // ...for this many consecutive ms (default 500)
-  timeout: 10000, // give up after this (default 30000, 0 disables)
+  timeout: 10000, // give up after this (default 30000, 0 or Infinity disables)
 });
 // resolves with the PendingRequest[] still counted as in flight
 ```

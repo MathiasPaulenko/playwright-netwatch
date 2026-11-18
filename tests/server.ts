@@ -44,7 +44,11 @@ export async function startServer(): Promise<TestServer> {
     }
   });
 
-  const upgraded = new Set<Duplex>();
+  const sockets = new Set<Duplex>();
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
 
   server.on('upgrade', (req, socket) => {
     if (!req.url?.startsWith('/ws')) {
@@ -61,8 +65,6 @@ export async function startServer(): Promise<TestServer> {
         'Connection: Upgrade\r\n' +
         `Sec-WebSocket-Accept: ${accept}\r\n\r\n`,
     );
-    upgraded.add(socket);
-    socket.on('close', () => upgraded.delete(socket));
     socket.on('data', (frame) => {
       // Answer close frames so the browser sees a clean websocket shutdown.
       if ((frame[0] & 0x0f) === 0x8) {
@@ -80,8 +82,9 @@ export async function startServer(): Promise<TestServer> {
     wsUrl: `ws://127.0.0.1:${port}`,
     close: () =>
       new Promise((resolve, reject) => {
-        for (const socket of upgraded) socket.destroy();
-        server.closeAllConnections();
+        // Tracked manually: kills keep-alive, /hang and upgraded sockets even
+        // where closeAllConnections is unavailable (Node <18.2).
+        for (const socket of sockets) socket.destroy();
         server.close((err) => (err ? reject(err) : resolve()));
       }),
   };

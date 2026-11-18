@@ -40,28 +40,39 @@ function collectSpecs(node: unknown, out: SpecResult[]): void {
 }
 
 async function runFixtureSpecs(): Promise<{ code: number; specs: SpecResult[] }> {
-  const { code, stdout } = await new Promise<{ code: number; stdout: string }>(
-    (resolve) => {
-      execFile(
-        process.execPath,
-        [
-          playwrightCli,
-          'test',
-          '--config',
-          'tests/fixtures/playwright.config.ts',
-          '--reporter=json',
-        ],
-        { cwd: process.cwd(), maxBuffer: 16 * 1024 * 1024 },
-        (error, stdout) =>
-          resolve({
-            code: error ? (error.code as number) : 0,
-            stdout: String(stdout),
-          }),
-      );
-    },
-  );
+  const { code, stdout, stderr } = await new Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+  }>((resolve) => {
+    execFile(
+      process.execPath,
+      [
+        playwrightCli,
+        'test',
+        '--config',
+        'tests/fixtures/playwright.config.ts',
+        '--reporter=json',
+      ],
+      { cwd: process.cwd(), maxBuffer: 16 * 1024 * 1024 },
+      (error, stdout, stderr) =>
+        resolve({
+          code: error ? (error.code as number) : 0,
+          stdout: String(stdout),
+          stderr: String(stderr),
+        }),
+    );
+  });
+  let report: unknown;
+  try {
+    report = JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      `fixture run produced no JSON report (exit ${code}): ${(error as Error).message}\nstderr: ${stderr.slice(0, 2000)}\nstdout: ${stdout.slice(0, 2000)}`,
+    );
+  }
   const specs: SpecResult[] = [];
-  collectSpecs(JSON.parse(stdout), specs);
+  collectSpecs(report, specs);
   return { code, specs };
 }
 
